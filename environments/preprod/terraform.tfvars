@@ -14,4 +14,5 @@ tags = {
   ManagedBy      = "terraform"
   CallingDBXAcct = "admin@datajilla"
   CalledAWSAcct  = "datajilla@gmail.com"
+  TestPipeline   = "verify-ci-cd-flow"
 }
