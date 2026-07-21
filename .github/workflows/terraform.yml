@@ -4,9 +4,17 @@ on:
   pull_request:
     branches:
       - main
+    paths:
+      - "environments/preprod/**"
+      - "environments/prod/**"
+      - "modules/**"
   push:
     branches:
       - main
+    paths:
+      - "environments/preprod/**"
+      - "environments/prod/**"
+      - "modules/**"
 
 permissions:
   contents: read
@@ -20,10 +28,36 @@ env:
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
 jobs:
-  plan:
-    name: Terraform Plan
-    if: github.event_name == 'pull_request'
+  detect-changes:
+    name: Detect Changed Environments
     runs-on: ubuntu-latest
+    outputs:
+      preprod: ${{ steps.filter.outputs.preprod }}
+      prod: ${{ steps.filter.outputs.prod }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect path changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            preprod:
+              - 'environments/preprod/**'
+              - 'modules/**'
+            prod:
+              - 'environments/prod/**'
+              - 'modules/**'
+
+  plan-preprod:
+    name: Plan (preprod)
+    needs: detect-changes
+    if: github.event_name == 'pull_request' && needs.detect-changes.outputs.preprod == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: environments/preprod
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,10 +69,6 @@ jobs:
 
       - name: Terraform Init
         run: terraform init
-
-      - name: Terraform Format Check
-        run: terraform fmt -check -recursive
-        continue-on-error: true
 
       - name: Terraform Validate
         run: terraform validate
@@ -54,7 +84,7 @@ jobs:
           PLAN: "${{ steps.plan.outputs.stdout }}${{ steps.plan.outputs.stderr }}"
         with:
           script: |
-            const output = `#### Terraform Plan 📖
+            const output = `#### Terraform Plan for \`preprod\` 📖
             \`\`\`
             ${process.env.PLAN}
             \`\`\`
@@ -70,10 +100,89 @@ jobs:
         if: steps.plan.outcome == 'failure'
         run: exit 1
 
-  apply:
-    name: Terraform Apply
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  plan-prod:
+    name: Plan (prod)
+    needs: detect-changes
+    if: github.event_name == 'pull_request' && needs.detect-changes.outputs.prod == 'true'
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: environments/prod
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -no-color -input=false
+        continue-on-error: true
+
+      - name: Comment Plan on PR
+        uses: actions/github-script@v7
+        env:
+          PLAN: "${{ steps.plan.outputs.stdout }}${{ steps.plan.outputs.stderr }}"
+        with:
+          script: |
+            const output = `#### Terraform Plan for \`prod\` 📖
+            \`\`\`
+            ${process.env.PLAN}
+            \`\`\`
+            `;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });
+
+      - name: Fail if plan failed
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+  apply-preprod:
+    name: Apply (preprod)
+    needs: detect-changes
+    if: github.event_name == 'push' && needs.detect-changes.outputs.preprod == 'true'
+    runs-on: ubuntu-latest
+    environment: preprod
+    defaults:
+      run:
+        working-directory: environments/preprod
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve -input=false
+
+  apply-prod:
+    name: Apply (prod)
+    needs: detect-changes
+    if: github.event_name == 'push' && needs.detect-changes.outputs.prod == 'true'
+    runs-on: ubuntu-latest
+    environment: prod
+    defaults:
+      run:
+        working-directory: environments/prod
     steps:
       - name: Checkout
         uses: actions/checkout@v4

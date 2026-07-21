@@ -1,4 +1,4 @@
-# versions.tf
+# versions.tf (prod)
 terraform {
   required_providers {
     databricks = {
@@ -14,7 +14,7 @@ terraform {
 
   backend "s3" {
     bucket         = "dbx-tfstate-457961354417"
-    key            = "preprod/terraform.tfstate"
+    key            = "prod/terraform.tfstate"
     region         = "us-east-1"
     dynamodb_table = "dbx-tfstate-lock"
     encrypt        = true
@@ -31,4 +31,3 @@ provider "databricks" {
   client_id     = var.databricks_account_client_id
   client_secret = var.databricks_account_client_secret
 }
-
