@@ -2,6 +2,7 @@
 # Secrets (Databricks account ID/client id/secret, AWS keys) are supplied via
 # the .env file (see .env.example) and picked up as TF_VAR_* / AWS_* env vars,
 # or via GitHub Secrets/Environments in CI.
+# JANA COMMENT ADDED to TEST
 
 region = "us-east-1"
 prefix = "prod-dbx"
