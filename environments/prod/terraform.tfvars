@@ -5,7 +5,8 @@
 # JANA COMMENT ADDED to TEST
 
 region = "us-east-1"
-prefix = "prod-dbx"
+prefix = "prod-dbx-457961354417"
+
 
 # Leave as default unless it overlaps with an existing VPC in your AWS account.
 # cidr_block = "10.4.0.0/16"
